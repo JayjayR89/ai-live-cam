@@ -30,7 +30,22 @@ interface Settings {
   captureQuality: 'high' | 'medium' | 'low';
   completeAlert: boolean;
   tooltips: boolean;
+  realTimeDetection?: boolean;
+  detectionClasses?: string[];
 }
+
+const COCO_CLASSES = [
+  'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
+  'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat',
+  'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack',
+  'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
+  'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+  'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
+  'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake',
+  'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+  'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
+  'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+];
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -50,7 +65,9 @@ const defaultSettings: Settings = {
   captureAmount: 5,
   captureQuality: 'high',
   completeAlert: true,
-  tooltips: true
+  tooltips: true,
+  realTimeDetection: false,
+  detectionClasses: ['person', 'cat', 'dog'],
 };
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -424,6 +441,48 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     />
                   </div>
                 </>
+              )}
+            </div>
+          </Card>
+
+          {/* Real-time Detection Settings */}
+          <Card className="p-4">
+            <h3 className="font-medium mb-3 flex items-center gap-2">
+              <HelpCircle className="h-4 w-4" />
+              Real-time Object Detection
+            </h3>
+            <div className="space-y-2 mt-6">
+              <Label className="flex items-center gap-2">
+                <Switch
+                  checked={tempSettings.realTimeDetection}
+                  onCheckedChange={checked => setTempSettings(s => ({ ...s, realTimeDetection: checked }))}
+                />
+                Enable Real-time Object Detection
+              </Label>
+              {tempSettings.realTimeDetection && (
+                <div className="ml-6">
+                  <Label className="block mb-2">Highlight Objects:</Label>
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                    {COCO_CLASSES.map(cls => (
+                      <Label key={cls} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={tempSettings.detectionClasses?.includes(cls) ?? false}
+                          onChange={e => {
+                            const checked = e.target.checked;
+                            setTempSettings(s => ({
+                              ...s,
+                              detectionClasses: checked
+                                ? [...(s.detectionClasses || []), cls]
+                                : (s.detectionClasses || []).filter(c => c !== cls)
+                            }));
+                          }}
+                        />
+                        {cls}
+                      </Label>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </Card>
