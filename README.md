@@ -1,4 +1,32 @@
-# Welcome to your Lovable project
+# AI Live Cam v2.0.0 - Real-time Object Detection
+
+A powerful Progressive Web App (PWA) featuring real-time object detection, AI-powered image analysis, and voice synthesis.
+
+## 🚀 New Features (v2.0.0)
+
+### 🎯 Real-time Object Detection
+- **TensorFlow.js Integration**: Real-time object detection using COCO-SSD model
+- **Live Highlighting**: Visual bounding boxes and labels on detected objects
+- **Performance Optimized**: Efficient detection with FPS monitoring
+- **Confidence Filtering**: Adjustable detection confidence thresholds
+
+### 📱 Progressive Web App (PWA)
+- **Installable**: Add to home screen on mobile and desktop
+- **Offline Support**: Works without internet connection
+- **Push Notifications**: Get notified when batches and AI analysis complete
+- **App Shortcuts**: Quick access to capture and detection modes
+
+### 🔔 Smart Notifications
+- **Batch Completion**: Alerts when auto-capture batches finish
+- **AI Analysis Complete**: Notifications when image descriptions are ready
+- **Object Detection Alerts**: Real-time notifications for detected objects
+- **Error Notifications**: Actionable alerts for troubleshooting
+
+### ⚡ Performance Optimizations
+- **Code Splitting**: Optimized bundle loading with TensorFlow chunks
+- **Efficient Caching**: Service worker caching for faster load times
+- **Mobile Optimized**: Enhanced touch interactions and gestures
+- **Resource Management**: Intelligent model loading and memory management
 
 ## Project info
 
@@ -54,11 +82,53 @@ npm run dev
 
 This project is built with:
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- **Vite** - Fast build tool and development server
+- **TypeScript** - Type-safe JavaScript development
+- **React** - Modern UI framework with hooks and context
+- **shadcn-ui** - Beautiful, accessible component library
+- **Tailwind CSS** - Utility-first CSS framework
+- **TensorFlow.js** - Machine learning in the browser
+- **COCO-SSD** - Real-time object detection model
+- **Workbox** - PWA service worker for caching and offline support
+- **Web Speech API** - Text-to-speech synthesis
+- **MediaDevices API** - Camera and video capture
+
+## 🔮 Suggested New Features
+
+### 🎥 Advanced Vision Features
+- **Face Recognition**: Identify and tag people in photos
+- **OCR Text Extraction**: Extract text from captured images
+- **QR/Barcode Scanner**: Decode QR codes and barcodes in real-time
+- **Gesture Recognition**: Hand gesture detection and commands
+- **Pose Estimation**: Human pose detection and analysis
+
+### 🤖 Enhanced AI Capabilities
+- **Custom Object Training**: Train custom detection models
+- **Scene Understanding**: Advanced scene classification and context
+- **Sentiment Analysis**: Analyze emotions in detected faces
+- **Image Similarity Search**: Find similar images in your gallery
+- **Auto-tagging**: Automatic image categorization and tagging
+
+### 📊 Analytics & Insights
+- **Usage Statistics**: Track app usage patterns and metrics
+- **Detection Analytics**: Object detection frequency and trends
+- **Export Data**: Export analysis data in various formats
+- **Cloud Sync**: Sync images and data across devices
+- **Collaboration**: Share images and analysis with teams
+
+### 🎨 Creative Features
+- **AR Overlays**: Augmented reality effects and filters
+- **Image Editing**: Basic photo editing and enhancement tools
+- **Collage Maker**: Create collages from captured images
+- **Time-lapse**: Automatic time-lapse video creation
+- **Live Streaming**: Stream camera feed with real-time analysis
+
+### 🔧 Developer Features
+- **API Integration**: Connect with external AI services
+- **Plugin System**: Extensible architecture for custom features
+- **Webhook Support**: Real-time data push to external systems
+- **SDK**: JavaScript SDK for integrating with other apps
+- **Batch Processing**: Process multiple images efficiently
 
 ## How can I deploy this project?
 
