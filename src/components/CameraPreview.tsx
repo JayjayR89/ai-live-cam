@@ -20,6 +20,7 @@ interface CameraPreviewProps {
   // New props for detection
   realTimeDetection?: boolean;
   detectionClasses?: string[];
+  onDetectionsUpdate?: (objects: { class: string; score: number; bbox: number[] }[]) => void;
 }
 
 export const CameraPreview: React.FC<CameraPreviewProps> = ({
@@ -33,10 +34,12 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
   showFlipButton = true,
   realTimeDetection = false,
   detectionClasses = [],
+  onDetectionsUpdate,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const modelRef = useRef<cocoSsd.ObjectDetection | null>(null);
   const detectionLoopRef = useRef<number | null>(null);
+  const [detectedObjects, setDetectedObjects] = React.useState<{ class: string; score: number; bbox: number[] }[]>([]);
 
   // Load model on mount if detection enabled
   useEffect(() => {
@@ -51,6 +54,8 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
   // Detection loop
   useEffect(() => {
     if (!realTimeDetection || !videoLoaded || !videoRef.current || !canvasRef.current || !modelRef.current) {
+      setDetectedObjects([]);
+      if (onDetectionsUpdate) onDetectionsUpdate([]);
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -69,8 +74,10 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       try {
         const predictions = await modelRef.current.detect(video);
-        predictions.forEach(pred => {
-          if (!detectionClasses.includes(pred.class)) return;
+        const filtered = predictions.filter(pred => detectionClasses.includes(pred.class));
+        setDetectedObjects(filtered.map(pred => ({ class: pred.class, score: pred.score, bbox: pred.bbox })));
+        if (onDetectionsUpdate) onDetectionsUpdate(filtered.map(pred => ({ class: pred.class, score: pred.score, bbox: pred.bbox })));
+        filtered.forEach(pred => {
           // Draw bounding box
           ctx.strokeStyle = '#00FF00';
           ctx.lineWidth = 2;
@@ -92,7 +99,7 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
       stopped = true;
       if (detectionLoopRef.current) window.cancelAnimationFrame(detectionLoopRef.current);
     };
-  }, [realTimeDetection, videoLoaded, detectionClasses, videoRef]);
+  }, [realTimeDetection, videoLoaded, detectionClasses, videoRef, onDetectionsUpdate]);
 
   return (
     <Card className={`relative transition-all duration-300 ${
@@ -151,6 +158,20 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
           </Button>
         )}
       </div>
+      {/* Detected objects list UI */}
+      {realTimeDetection && detectedObjects.length > 0 && (
+        <div className="p-2 bg-black/70 text-white text-xs rounded-b-lg max-h-32 overflow-y-auto">
+          <div className="font-semibold mb-1">Detected Objects:</div>
+          <ul>
+            {detectedObjects.map((obj, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span className="font-mono">{obj.class}</span>
+                <span className="opacity-70">({(obj.score * 100).toFixed(1)}%)</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </Card>
   );
 };

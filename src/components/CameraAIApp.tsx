@@ -59,6 +59,7 @@ const CameraAIApp: React.FC = () => {
   const [showFlash, setShowFlash] = useState(false);
   const [aiQueue, setAiQueue] = useState<CapturedImage[]>([]);
   const [processingAI, setProcessingAI] = useState(false);
+  const [latestDetections, setLatestDetections] = useState<{ class: string; score: number; bbox: number[] }[]>([]);
 
   // Settings state
   const [settings, setSettings] = useState<Settings>({
@@ -536,6 +537,17 @@ const CameraAIApp: React.FC = () => {
     return isCapturing ? 'Capturing...' : 'Capture';
   };
 
+  // Export detections as JSON
+  const exportDetections = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(latestDetections, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `detections_${Date.now()}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-dark text-foreground">
       {/* Flash overlay */}
@@ -614,7 +626,16 @@ const CameraAIApp: React.FC = () => {
             showFlipButton={true}
             realTimeDetection={settings.realTimeDetection}
             detectionClasses={settings.detectionClasses}
+            onDetectionsUpdate={setLatestDetections}
           />
+        )}
+        {/* Export Detections Button */}
+        {settings.realTimeDetection && latestDetections.length > 0 && (
+          <div className="flex justify-end mt-2">
+            <Button onClick={exportDetections} variant="outline" size="sm">
+              Export Detections (JSON)
+            </Button>
+          </div>
         )}
 
         {/* Auto-Capture Progress */}
