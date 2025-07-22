@@ -13,24 +13,68 @@ interface Detection {
   score: number;
 }
 
+export interface DetectionSettings {
+  enablePeople: boolean;
+  enableVehicles: boolean;
+  enableAnimals: boolean;
+  enableObjects: boolean;
+  enableElectronics: boolean;
+  showLabels: boolean;
+  showConfidence: boolean;
+  minConfidence: number;
+}
+
 interface ObjectDetectionProps {
   videoRef: React.RefObject<HTMLVideoElement>;
   isActive: boolean;
   onToggle: () => void;
-  confidence?: number;
-  highlightColor?: string;
-  showLabels?: boolean;
+  settings?: DetectionSettings;
   onDetection?: (detections: Detection[]) => void;
+  onSettingsChange?: (settings: DetectionSettings) => void;
 }
+
+// Object category definitions with colors
+const OBJECT_CATEGORIES = {
+  people: {
+    color: '#FF6B6B', // Red
+    objects: ['person', 'face']
+  },
+  vehicles: {
+    color: '#4ECDC4', // Teal
+    objects: ['car', 'truck', 'bus', 'motorcycle', 'bicycle', 'airplane', 'train', 'boat']
+  },
+  animals: {
+    color: '#45B7D1', // Blue
+    objects: ['bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe']
+  },
+  objects: {
+    color: '#96CEB4', // Green
+    objects: ['bottle', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush']
+  },
+  electronics: {
+    color: '#FECA57', // Yellow
+    objects: ['tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator']
+  }
+};
+
+const DEFAULT_SETTINGS: DetectionSettings = {
+  enablePeople: true,
+  enableVehicles: true,
+  enableAnimals: true,
+  enableObjects: true,
+  enableElectronics: true,
+  showLabels: true,
+  showConfidence: true,
+  minConfidence: 0.5
+};
 
 export const ObjectDetection: React.FC<ObjectDetectionProps> = ({
   videoRef,
   isActive,
   onToggle,
-  confidence = 0.5,
-  highlightColor = '#3B82F6',
-  showLabels = true,
-  onDetection
+  settings = DEFAULT_SETTINGS,
+  onDetection,
+  onSettingsChange
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const modelRef = useRef<cocoSsd.ObjectDetection | null>(null);
@@ -41,6 +85,29 @@ export const ObjectDetection: React.FC<ObjectDetectionProps> = ({
   const [fps, setFps] = useState(0);
   const [lastFrameTime, setLastFrameTime] = useState(0);
   const [frameCount, setFrameCount] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // Get category and color for an object
+  const getObjectInfo = (className: string) => {
+    for (const [category, info] of Object.entries(OBJECT_CATEGORIES)) {
+      if (info.objects.includes(className)) {
+        return { category, color: info.color };
+      }
+    }
+    return { category: 'objects', color: OBJECT_CATEGORIES.objects.color };
+  };
+
+  // Check if object should be detected based on settings
+  const shouldDetectObject = (className: string) => {
+    const { category } = getObjectInfo(className);
+    switch (category) {
+      case 'people': return settings.enablePeople;
+      case 'vehicles': return settings.enableVehicles;
+      case 'animals': return settings.enableAnimals;
+      case 'electronics': return settings.enableElectronics;
+      default: return settings.enableObjects;
+    }
+  };
 
   // Load TensorFlow.js model
   const loadModel = useCallback(async () => {
@@ -93,17 +160,22 @@ export const ObjectDetection: React.FC<ObjectDetectionProps> = ({
       return;
     }
 
-    // Set canvas size to match video
+    // Set canvas size to match video exactly
+    const rect = video.getBoundingClientRect();
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
+    
+    // Position canvas to overlay video perfectly
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
 
     try {
       // Run object detection
       const predictions = await modelRef.current.detect(video);
       
-      // Filter predictions by confidence
-      const filteredPredictions = predictions.filter(
-        prediction => prediction.score >= confidence
+      // Filter predictions by confidence and enabled categories
+      const filteredPredictions = predictions.filter(prediction => 
+        prediction.score >= settings.minConfidence && shouldDetectObject(prediction.class)
       );
 
       // Convert to our Detection interface
@@ -119,32 +191,47 @@ export const ObjectDetection: React.FC<ObjectDetectionProps> = ({
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw bounding boxes and labels
+      // Draw bounding boxes and labels with category colors
       if (filteredPredictions.length > 0) {
-        ctx.strokeStyle = highlightColor;
         ctx.lineWidth = 3;
-        ctx.font = '16px Arial';
-        ctx.fillStyle = highlightColor;
+        ctx.font = 'bold 16px Arial';
+        ctx.textBaseline = 'top';
 
         filteredPredictions.forEach(prediction => {
           const [x, y, width, height] = prediction.bbox;
+          const { color } = getObjectInfo(prediction.class);
           
-          // Draw bounding box
+          // Draw bounding box with category color
+          ctx.strokeStyle = color;
           ctx.strokeRect(x, y, width, height);
           
-          if (showLabels) {
-            // Draw label background
-            const label = `${prediction.class} (${Math.round(prediction.score * 100)}%)`;
+          // Add subtle glow effect
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 8;
+          ctx.strokeRect(x, y, width, height);
+          ctx.shadowBlur = 0;
+          
+          if (settings.showLabels) {
+            // Create label text
+            let label = prediction.class.charAt(0).toUpperCase() + prediction.class.slice(1);
+            if (settings.showConfidence) {
+              label += ` ${Math.round(prediction.score * 100)}%`;
+            }
+            
+            // Measure text for background
+            ctx.font = 'bold 14px Arial';
             const textMetrics = ctx.measureText(label);
             const textWidth = textMetrics.width;
-            const textHeight = 20;
+            const textHeight = 18;
+            const padding = 6;
             
-            ctx.fillStyle = highlightColor;
-            ctx.fillRect(x, y - textHeight - 4, textWidth + 8, textHeight + 4);
+            // Draw label background with category color
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y - textHeight - padding, textWidth + padding * 2, textHeight + padding);
             
             // Draw label text
             ctx.fillStyle = 'white';
-            ctx.fillText(label, x + 4, y - 8);
+            ctx.fillText(label, x + padding, y - textHeight);
           }
         });
       }
@@ -167,7 +254,7 @@ export const ObjectDetection: React.FC<ObjectDetectionProps> = ({
     if (isActive) {
       animationFrameRef.current = requestAnimationFrame(detectObjects);
     }
-  }, [videoRef, isActive, confidence, highlightColor, showLabels, onDetection, lastFrameTime]);
+  }, [videoRef, isActive, settings, onDetection, lastFrameTime, shouldDetectObject, getObjectInfo]);
 
   // Start/stop detection
   useEffect(() => {
@@ -202,8 +289,8 @@ export const ObjectDetection: React.FC<ObjectDetectionProps> = ({
   };
 
   return (
-    <div className="relative">
-      {/* Detection Canvas Overlay */}
+    <div className="relative w-full h-full">
+      {/* Detection Canvas Overlay - positioned to perfectly overlay video */}
       <canvas
         ref={canvasRef}
         className="absolute top-0 left-0 pointer-events-none z-10"
@@ -232,7 +319,16 @@ export const ObjectDetection: React.FC<ObjectDetectionProps> = ({
               ) : (
                 <EyeOff className="w-4 h-4" />
               )}
-              {isModelLoading ? 'Loading...' : isActive ? 'Detection On' : 'Detection Off'}
+              {isModelLoading ? 'Loading...' : isActive ? 'On' : 'Off'}
+            </Button>
+            
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowSettings(!showSettings)}
+              className="flex items-center gap-1 text-white hover:bg-white/20"
+            >
+              <Settings className="w-4 h-4" />
             </Button>
           </div>
           
@@ -249,22 +345,129 @@ export const ObjectDetection: React.FC<ObjectDetectionProps> = ({
             </div>
           )}
           
-          {/* Detected Objects List */}
+          {/* Category Legend */}
+          <div className="flex flex-wrap gap-1 text-xs">
+            {Object.entries(OBJECT_CATEGORIES).map(([category, info]) => (
+              <Badge 
+                key={category} 
+                variant="outline" 
+                className="text-white border-white/20"
+                style={{ backgroundColor: `${info.color}40`, borderColor: info.color }}
+              >
+                {category}
+              </Badge>
+            ))}
+          </div>
+          
+          {/* Detected Objects List with Colors */}
           {isActive && detections.length > 0 && (
-            <div className="max-w-40 max-h-32 overflow-y-auto space-y-1">
-              {detections.map((detection, index) => (
-                <Badge
-                  key={index}
-                  variant="outline"
-                  className="text-xs bg-black/40 text-white border-white/20 block w-full"
-                >
-                  {detection.class} ({Math.round(detection.score * 100)}%)
-                </Badge>
-              ))}
+            <div className="max-w-48 max-h-32 overflow-y-auto space-y-1">
+              {detections.map((detection, index) => {
+                const { color } = getObjectInfo(detection.class);
+                return (
+                  <Badge
+                    key={index}
+                    variant="outline"
+                    className="text-xs text-white border-white/20 block w-full"
+                    style={{ backgroundColor: `${color}60`, borderColor: color }}
+                  >
+                    {detection.class.charAt(0).toUpperCase() + detection.class.slice(1)} ({Math.round(detection.score * 100)}%)
+                  </Badge>
+                );
+              })}
             </div>
           )}
         </div>
       </Card>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <Card className="absolute top-4 left-4 p-4 bg-black/20 backdrop-blur-sm border-white/20 z-20 min-w-64">
+          <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Detection Settings
+          </h3>
+          
+          <div className="space-y-3">
+            {/* Category Toggles */}
+            <div className="space-y-2">
+              <label className="text-xs text-white/80">Categories to Detect:</label>
+              {Object.entries(OBJECT_CATEGORIES).map(([category, info]) => (
+                <div key={category} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={category}
+                    checked={settings[`enable${category.charAt(0).toUpperCase() + category.slice(1)}` as keyof DetectionSettings] as boolean}
+                    onChange={(e) => {
+                      const key = `enable${category.charAt(0).toUpperCase() + category.slice(1)}` as keyof DetectionSettings;
+                      onSettingsChange?.({
+                        ...settings,
+                        [key]: e.target.checked
+                      });
+                    }}
+                    className="rounded"
+                  />
+                  <label 
+                    htmlFor={category} 
+                    className="text-sm text-white cursor-pointer flex items-center gap-2"
+                  >
+                    <div 
+                      className="w-3 h-3 rounded" 
+                      style={{ backgroundColor: info.color }}
+                    />
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </label>
+                </div>
+              ))}
+            </div>
+            
+            {/* Display Options */}
+            <div className="space-y-2 pt-2 border-t border-white/20">
+              <label className="text-xs text-white/80">Display Options:</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showLabels"
+                  checked={settings.showLabels}
+                  onChange={(e) => onSettingsChange?.({...settings, showLabels: e.target.checked})}
+                  className="rounded"
+                />
+                <label htmlFor="showLabels" className="text-sm text-white cursor-pointer">
+                  Show Labels
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="showConfidence"
+                  checked={settings.showConfidence}
+                  onChange={(e) => onSettingsChange?.({...settings, showConfidence: e.target.checked})}
+                  className="rounded"
+                />
+                <label htmlFor="showConfidence" className="text-sm text-white cursor-pointer">
+                  Show Confidence %
+                </label>
+              </div>
+            </div>
+            
+            {/* Confidence Threshold */}
+            <div className="space-y-2 pt-2 border-t border-white/20">
+              <label className="text-xs text-white/80">
+                Min Confidence: {Math.round(settings.minConfidence * 100)}%
+              </label>
+              <input
+                type="range"
+                min="0.1"
+                max="0.9"
+                step="0.1"
+                value={settings.minConfidence}
+                onChange={(e) => onSettingsChange?.({...settings, minConfidence: parseFloat(e.target.value)})}
+                className="w-full"
+              />
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 };
