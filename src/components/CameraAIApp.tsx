@@ -16,7 +16,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { handleCameraError, handleConfigurationError, errorHandler } from '@/lib/errorHandling';
 import { LoadingIndicator, useLoadingOverlay } from './LoadingIndicator';
 import { cameraManager, configManager } from '@/lib/fallbacks';
-import { ObjectDetection } from './ObjectDetection';
+import { ObjectDetection, DetectionSettings } from './ObjectDetection';
 import { usePushNotifications } from '@/services/pushNotifications';
 
 // Using Puter.com API loaded from CDN
@@ -123,7 +123,16 @@ const CameraAIApp: React.FC = () => {
   // Object Detection state
   const [isObjectDetectionOn, setIsObjectDetectionOn] = useState(false);
   const [detectedObjects, setDetectedObjects] = useState<string[]>([]);
-  const [objectDetectionConfidence, setObjectDetectionConfidence] = useState(0.5);
+  const [detectionSettings, setDetectionSettings] = useState<DetectionSettings>({
+    enablePeople: true,
+    enableVehicles: true,
+    enableAnimals: true,
+    enableObjects: true,
+    enableElectronics: true,
+    showLabels: true,
+    showConfidence: true,
+    minConfidence: 0.5
+  });
 
   // Handle object detection results
   const handleObjectDetection = (detections: Array<{bbox: number[], class: string, score: number}>) => {
@@ -1328,10 +1337,9 @@ const CameraAIApp: React.FC = () => {
                 videoRef={videoRef}
                 isActive={isObjectDetectionOn}
                 onToggle={toggleObjectDetection}
-                confidence={objectDetectionConfidence}
-                highlightColor="#3B82F6"
-                showLabels={true}
+                settings={detectionSettings}
                 onDetection={handleObjectDetection}
+                onSettingsChange={setDetectionSettings}
               />
             )}
           </div>
