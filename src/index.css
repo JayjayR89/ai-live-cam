@@ -162,6 +162,69 @@ All colors MUST be HSL.
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* Camera flip animation utilities with hardware acceleration */
+  .animate-camera-flip {
+    animation: camera-flip 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Hardware acceleration for better performance */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+    will-change: transform, opacity;
+  }
+
+  .animate-camera-fade {
+    animation: camera-fade 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Hardware acceleration for better performance */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: transform, opacity;
+  }
+
+  .animate-camera-slide {
+    animation: camera-slide 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Hardware acceleration for better performance */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: transform, opacity;
+  }
+
+  /* Loading state animation with hardware acceleration */
+  .animate-camera-loading {
+    animation: camera-loading 1.5s ease-in-out infinite;
+    /* Hardware acceleration for better performance */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: transform, opacity;
+  }
+
+  /* Performance optimization utilities */
+  .hw-accelerated {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+
+  .optimize-animations {
+    will-change: transform, opacity;
+  }
+
+  /* Debounced animation class for performance */
+  .animate-debounced {
+    animation-fill-mode: both;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Respect user motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    .animate-camera-flip,
+    .animate-camera-fade,
+    .animate-camera-slide,
+    .animate-camera-loading {
+      animation: none;
+      transition: opacity 0.2s ease-in-out;
+    }
+  }
 }
 
 @layer components {
@@ -169,6 +232,72 @@ All colors MUST be HSL.
     @apply relative rounded-lg overflow-hidden border-2 border-transparent;
     border-color: hsl(var(--camera-border));
     box-shadow: var(--shadow-camera);
+    /* Hardware acceleration for better animation performance */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+    /* Optimize for animations */
+    will-change: transform, opacity;
+  }
+  
+  /* Responsive camera preview styles */
+  .camera-preview video {
+    @apply w-full h-full object-cover;
+    /* Ensure video fills container completely without cropping */
+    object-position: center;
+  }
+  
+  /* Desktop landscape styles (16:9) */
+  @media (min-width: 769px) and (orientation: landscape) {
+    .camera-preview {
+      @apply aspect-video max-w-full;
+    }
+    
+    .camera-preview video {
+      aspect-ratio: 16/9;
+    }
+  }
+  
+  /* Mobile portrait styles (9:16) */
+  @media (max-width: 768px) and (orientation: portrait) {
+    .camera-preview {
+      aspect-ratio: 9/16;
+      @apply max-w-sm mx-auto;
+    }
+    
+    .camera-preview video {
+      aspect-ratio: 9/16;
+    }
+  }
+  
+  /* Mobile landscape fallback (16:9) */
+  @media (max-width: 768px) and (orientation: landscape) {
+    .camera-preview {
+      @apply aspect-video max-w-full;
+    }
+    
+    .camera-preview video {
+      aspect-ratio: 16/9;
+    }
+  }
+  
+  /* Tablet and medium screens */
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .camera-preview {
+      @apply aspect-video max-w-2xl mx-auto;
+    }
+  }
+  
+  /* Large desktop screens */
+  @media (min-width: 1025px) {
+    .camera-preview {
+      @apply aspect-video max-w-4xl mx-auto;
+    }
+  }
+  
+  /* Ensure minimized preview maintains proper aspect ratio */
+  .camera-preview.minimized {
+    @apply transition-all duration-300;
   }
   
   .capture-button {
@@ -200,4 +329,96 @@ All colors MUST be HSL.
 @keyframes blink-cursor {
   from, to { border-color: transparent; }
   50% { border-color: hsl(var(--primary)); }
+}
+
+/* Enhanced Camera flip animations with hardware acceleration and performance optimizations */
+@keyframes camera-flip {
+  0% { 
+    opacity: 1; 
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1) rotateY(0deg); 
+  }
+  25% {
+    opacity: 0.7;
+    transform: translate3d(0, 0, 0) scale3d(0.98, 0.98, 1) rotateY(-5deg);
+  }
+  50% { 
+    opacity: 0.3; 
+    transform: translate3d(0, 0, 0) scale3d(0.95, 0.95, 1) rotateY(-10deg); 
+  }
+  75% {
+    opacity: 0.7;
+    transform: translate3d(0, 0, 0) scale3d(0.98, 0.98, 1) rotateY(-5deg);
+  }
+  100% { 
+    opacity: 1; 
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1) rotateY(0deg); 
+  }
+}
+
+@keyframes camera-fade {
+  0% { 
+    opacity: 1; 
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1); 
+  }
+  50% { 
+    opacity: 0; 
+    transform: translate3d(0, 0, 0) scale3d(0.98, 0.98, 1); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1); 
+  }
+}
+
+@keyframes camera-slide {
+  0% { 
+    opacity: 1; 
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1); 
+  }
+  25% {
+    opacity: 0.8;
+    transform: translate3d(-10px, 0, 0) scale3d(0.99, 0.99, 1);
+  }
+  50% { 
+    opacity: 0.4; 
+    transform: translate3d(-20px, 0, 0) scale3d(0.97, 0.97, 1); 
+  }
+  75% {
+    opacity: 0.8;
+    transform: translate3d(-10px, 0, 0) scale3d(0.99, 0.99, 1);
+  }
+  100% { 
+    opacity: 1; 
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1); 
+  }
+}
+
+@keyframes camera-loading {
+  0% { 
+    opacity: 0.6; 
+    transform: scale(1); 
+  }
+  50% { 
+    opacity: 0.9; 
+    transform: scale(1.02); 
+  }
+  100% { 
+    opacity: 0.6; 
+    transform: scale(1); 
+  }
+}
+
+@keyframes loading-progress {
+  0% { 
+    width: 0%; 
+    opacity: 0.8;
+  }
+  50% { 
+    width: 70%; 
+    opacity: 1;
+  }
+  100% { 
+    width: 100%; 
+    opacity: 0.9;
+  }
 }
