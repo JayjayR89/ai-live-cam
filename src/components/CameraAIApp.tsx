@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, CameraOff, Circle, Sparkles, Home, Settings, LogIn, LogOut, User, Loader, Download } from 'lucide-react';
+import { Camera, CameraOff, Circle, Sparkles, Home, Settings, LogIn, LogOut, User, Loader, Download, Eye, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -16,6 +16,8 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { handleCameraError, handleConfigurationError, errorHandler } from '@/lib/errorHandling';
 import { LoadingIndicator, useLoadingOverlay } from './LoadingIndicator';
 import { cameraManager, configManager } from '@/lib/fallbacks';
+import { ObjectDetection, DetectionSettings } from './ObjectDetection';
+import { usePushNotifications } from '@/services/pushNotifications';
 
 // Using Puter.com API loaded from CDN
 declare const puter: any;
@@ -118,6 +120,35 @@ const CameraAIApp: React.FC = () => {
   const [aiQueue, setAiQueue] = useState<CapturedImage[]>([]);
   const [processingAI, setProcessingAI] = useState(false);
 
+  // Object Detection state
+  const [isObjectDetectionOn, setIsObjectDetectionOn] = useState(false);
+  const [detectedObjects, setDetectedObjects] = useState<string[]>([]);
+  const [detectionSettings, setDetectionSettings] = useState<DetectionSettings>({
+    enablePeople: true,
+    enableVehicles: true,
+    enableAnimals: true,
+    enableObjects: true,
+    enableElectronics: true,
+    showLabels: true,
+    showConfidence: true,
+    minConfidence: 0.5
+  });
+
+  // Handle object detection results
+  const handleObjectDetection = (detections: Array<{bbox: number[], class: string, score: number}>) => {
+    const objects = detections.map(d => d.class);
+    setDetectedObjects(objects);
+    
+    // Notify of new objects if significant detection
+    if (detections.length > 0 && detections[0].score > 0.8) {
+      pushNotifications.notifyObjectDetected(objects, detections[0].score);
+    }
+  };
+
+  const toggleObjectDetection = () => {
+    setIsObjectDetectionOn(!isObjectDetectionOn);
+  };
+
   // Settings state
   const [settings, setSettings] = useState<Settings>({
     theme: 'dark',
@@ -187,6 +218,32 @@ const CameraAIApp: React.FC = () => {
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Push notifications and PWA
+  const pushNotifications = usePushNotifications();
+  const [showPWAPrompt, setShowPWAPrompt] = useState(false);
+
+  // Initialize push notifications
+  useEffect(() => {
+    if (pushNotifications.isSupported) {
+      pushNotifications.initialize().then(initialized => {
+        if (initialized) {
+          console.log('Push notifications initialized');
+        }
+      });
+    }
+  }, []);
+
+  // PWA install prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setShowPWAPrompt(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
 
   // Fallback TTS function for when configured TTS fails
   const fallbackTTS = async (text: string) => {
@@ -352,7 +409,7 @@ const CameraAIApp: React.FC = () => {
     }
   };
 
-  // Auto-capture hook
+  // Auto-capture hook with completion notification
   const autoCapture = useAutoCapture(
     {
       enabled: settings.autoCapture,
@@ -363,6 +420,15 @@ const CameraAIApp: React.FC = () => {
     captureImage,
     isCameraOn && videoLoaded && !isCapturing
   );
+
+  // Watch for auto capture completion
+  useEffect(() => {
+    if (autoCapture.isActive === false && autoCapture.currentCount === 0 && 
+        capturedImages.length > 0 && settings.autoCapture) {
+      // Auto capture just completed
+      pushNotifications.notifyBatchComplete(1, settings.captureAmount);
+    }
+  }, [autoCapture.isActive, autoCapture.currentCount, capturedImages.length, settings.autoCapture]);
 
   // Load settings on mount with proper cleanup
   useEffect(() => {
@@ -555,6 +621,12 @@ const CameraAIApp: React.FC = () => {
       // Remove processed image from queue
       setAiQueue(prev => prev.slice(1));
       setProcessingAI(false);
+      
+      // Notify AI completion
+      if (imageToProcess) {
+        const processingTime = Date.now() - (imageToProcess.timestamp?.getTime() || Date.now());
+        pushNotifications.notifyAIAnalysisComplete(1, processingTime);
+      }
     }
   };
 
@@ -1184,6 +1256,23 @@ const CameraAIApp: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
+          {/* PWA Install Button */}
+          {showPWAPrompt && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                pushNotifications.notifyInstallPrompt();
+                setShowPWAPrompt(false);
+              }}
+              className="flex items-center gap-2"
+              title={settings.tooltips ? "Install app for better performance" : undefined}
+            >
+              <Download className="h-4 w-4" />
+              Install
+            </Button>
+          )}
+          
           <Button 
             variant="ghost" 
             size="icon" 
@@ -1225,22 +1314,35 @@ const CameraAIApp: React.FC = () => {
             </div>
           </Card>
         )}
-        {/* Camera Preview */}
+        {/* Camera Preview with Object Detection */}
         {(isCameraOn || isCameraLoading) && (
-          <CameraPreview
-            videoRef={videoRef}
-            isMinimized={isMinimized}
-            onToggleMinimize={() => setIsMinimized(!isMinimized)}
-            onFlipCamera={flipCamera}
-            isCameraLoading={isCameraLoading}
-            videoLoaded={videoLoaded}
-            availableCameras={availableCameras}
-            showFlipButton={true}
-            previewMinWidth={settings.previewMinWidth}
-            previewMinHeight={settings.previewMinHeight}
-            maintainAspectRatio={settings.maintainAspectRatio}
-            isFlipping={isFlipping}
-          />
+          <div className="relative">
+            <CameraPreview
+              videoRef={videoRef}
+              isMinimized={isMinimized}
+              onToggleMinimize={() => setIsMinimized(!isMinimized)}
+              onFlipCamera={flipCamera}
+              isCameraLoading={isCameraLoading}
+              videoLoaded={videoLoaded}
+              availableCameras={availableCameras}
+              showFlipButton={true}
+              previewMinWidth={settings.previewMinWidth}
+              previewMinHeight={settings.previewMinHeight}
+              maintainAspectRatio={settings.maintainAspectRatio}
+              isFlipping={isFlipping}
+            />
+            {/* Object Detection Overlay */}
+            {videoLoaded && (
+              <ObjectDetection
+                videoRef={videoRef}
+                isActive={isObjectDetectionOn}
+                onToggle={toggleObjectDetection}
+                settings={detectionSettings}
+                onDetection={handleObjectDetection}
+                onSettingsChange={setDetectionSettings}
+              />
+            )}
+          </div>
         )}
 
         {/* Auto-Capture Progress */}
@@ -1314,6 +1416,40 @@ const CameraAIApp: React.FC = () => {
               </>
             )}
           </Button>
+        </div>
+
+        {/* Object Detection & AI Controls */}
+        <div className="grid grid-cols-2 gap-4">
+          <Button 
+            onClick={toggleObjectDetection}
+            disabled={!isCameraOn || !videoLoaded}
+            variant={isObjectDetectionOn ? "default" : "outline"}
+            className="h-12"
+            title={settings.tooltips ? "Toggle real-time object detection" : undefined}
+          >
+            {isObjectDetectionOn ? (
+              <>
+                <Eye className="h-5 w-5 mr-2" />
+                Detection On
+              </>
+            ) : (
+              <>
+                <Target className="h-5 w-5 mr-2" />
+                Detect Objects
+              </>
+            )}
+          </Button>
+          
+          {detectedObjects.length > 0 && (
+            <Button 
+              variant="secondary" 
+              className="h-12 text-sm"
+              disabled
+            >
+              <Target className="h-4 w-4 mr-2" />
+              {detectedObjects.length} object{detectedObjects.length > 1 ? 's' : ''} found
+            </Button>
+          )}
         </div>
 
         {/* Image Gallery */}
