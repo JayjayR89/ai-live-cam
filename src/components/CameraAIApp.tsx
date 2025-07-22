@@ -32,6 +32,8 @@ interface Settings {
   captureQuality: 'high' | 'medium' | 'low';
   completeAlert: boolean;
   tooltips: boolean;
+  realTimeDetection: boolean;
+  detectionClasses: string[];
 }
 
 const CameraAIApp: React.FC = () => {
@@ -67,7 +69,9 @@ const CameraAIApp: React.FC = () => {
     captureAmount: 5,
     captureQuality: 'high',
     completeAlert: true,
-    tooltips: true
+    tooltips: true,
+    realTimeDetection: false,
+    detectionClasses: []
   });
 
   // UI state
@@ -608,6 +612,8 @@ const CameraAIApp: React.FC = () => {
             videoLoaded={videoLoaded}
             availableCameras={availableCameras}
             showFlipButton={true}
+            realTimeDetection={settings.realTimeDetection}
+            detectionClasses={settings.detectionClasses}
           />
         )}
 

@@ -1,8 +1,12 @@
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { RotateCcw, Minimize2, Maximize2, Loader } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+
+// Add imports for TensorFlow.js
+import * as cocoSsd from '@tensorflow-models/coco-ssd';
+import '@tensorflow/tfjs';
 
 interface CameraPreviewProps {
   videoRef: React.RefObject<HTMLVideoElement>;
@@ -13,6 +17,9 @@ interface CameraPreviewProps {
   videoLoaded: boolean;
   availableCameras: MediaDeviceInfo[];
   showFlipButton?: boolean;
+  // New props for detection
+  realTimeDetection?: boolean;
+  detectionClasses?: string[];
 }
 
 export const CameraPreview: React.FC<CameraPreviewProps> = ({
@@ -23,8 +30,70 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
   isCameraLoading,
   videoLoaded,
   availableCameras,
-  showFlipButton = true
+  showFlipButton = true,
+  realTimeDetection = false,
+  detectionClasses = [],
 }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const modelRef = useRef<cocoSsd.ObjectDetection | null>(null);
+  const detectionLoopRef = useRef<number | null>(null);
+
+  // Load model on mount if detection enabled
+  useEffect(() => {
+    if (!realTimeDetection) return;
+    let isMounted = true;
+    cocoSsd.load().then(model => {
+      if (isMounted) modelRef.current = model;
+    });
+    return () => { isMounted = false; };
+  }, [realTimeDetection]);
+
+  // Detection loop
+  useEffect(() => {
+    if (!realTimeDetection || !videoLoaded || !videoRef.current || !canvasRef.current || !modelRef.current) {
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+      return;
+    }
+    let stopped = false;
+    const detect = async () => {
+      if (!videoRef.current || !canvasRef.current || !modelRef.current) return;
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      try {
+        const predictions = await modelRef.current.detect(video);
+        predictions.forEach(pred => {
+          if (!detectionClasses.includes(pred.class)) return;
+          // Draw bounding box
+          ctx.strokeStyle = '#00FF00';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(...pred.bbox);
+          // Draw label
+          ctx.font = '16px sans-serif';
+          ctx.fillStyle = '#00FF00';
+          ctx.fillText(pred.class, pred.bbox[0], pred.bbox[1] > 20 ? pred.bbox[1] - 5 : 10);
+        });
+      } catch (e) {
+        // ignore
+      }
+      if (!stopped) {
+        detectionLoopRef.current = window.requestAnimationFrame(detect);
+      }
+    };
+    detectionLoopRef.current = window.requestAnimationFrame(detect);
+    return () => {
+      stopped = true;
+      if (detectionLoopRef.current) window.cancelAnimationFrame(detectionLoopRef.current);
+    };
+  }, [realTimeDetection, videoLoaded, detectionClasses, videoRef]);
+
   return (
     <Card className={`relative transition-all duration-300 ${
       isMinimized ? 'w-auto h-[30vh]' : 'w-full'
@@ -40,7 +109,6 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
             </div>
           </div>
         )}
-        
         <video 
           ref={videoRef} 
           autoPlay 
@@ -51,7 +119,14 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
           }`}
           style={{ aspectRatio: '16/9' }}
         />
-        
+        {/* Detection Canvas Overlay */}
+        {realTimeDetection && (
+          <canvas
+            ref={canvasRef}
+            className="absolute top-0 left-0 w-full h-full pointer-events-none z-20"
+            style={{ aspectRatio: '16/9' }}
+          />
+        )}
         {/* Top Left - Minimize/Maximize Button */}
         <Button 
           variant="secondary" 
@@ -62,7 +137,6 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
         >
           {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
         </Button>
-        
         {/* Top Right - Flip Camera Button - Always show when camera is ready and multiple cameras available */}
         {showFlipButton && availableCameras.length > 1 && videoLoaded && !isMinimized && (
           <Button 
